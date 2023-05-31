@@ -12,6 +12,8 @@ from random import randrange;
 class MCMC:
     #Takes 2 arguments, an ODE and a log likelihood function to optimize
     def __init__(self,ODE,LL):
+        self.data = None
+        self.time_series = None
         self.ODE = ODE;
         self.LL = LL;
 
@@ -153,7 +155,7 @@ sampler.load_intial_condition(1);
 generator.load_data(sampler,"noisy_data.csv");
 sampler.print_data();
 
-sampler.run(100000);
+sampler.run(1000);
 
 
 
