@@ -54,6 +54,10 @@ class MCMC:
             if i % 100 == 0:
                 print("Percent complete: {0}".format(round((i / self.iter) * 100, 2)));
                 print("acceptance rate: {0}\n".format(round((num_accept / i) * 100, 2)));
+                if num_accept/i > .234:
+                    self.scale *= 1.1;
+                else:
+                    self.scale *= 0.9;
 
             paramtest = [np.random.normal(loc=self.param_set[-1][0], scale=self.scale[0]),
                          np.random.normal(loc=self.param_set[-1][1], scale=self.scale[1])];
@@ -100,6 +104,21 @@ class MCMC:
        self.metropolis();
        self.plot();
 
+class data_gen:
+    def generate_data(self,ODE,ODE_0,time):
+        params = np.array([np.random.uniform(0,1), np.random.uniform(500,2000)]);
+        print(params)
+        X = odeint(ODE, ODE_0, time, args=tuple(params));
+        for x in range(len(X)):
+            X[x] += np.random.normal(0, 100);
+
+        X = np.squeeze(X);
+        data = np.stack((time, X), axis=-1);
+
+        df = pd.DataFrame(data);
+        df.columns = ["time", "cell_count"];
+        df.to_csv('noisy_data.csv', index=False);
+
 
 #model definitions
 
@@ -120,12 +139,14 @@ def log_likelihood(ODE,ODE_0, t, data,params):
   return LL;
 
 
-
-
+time_series = np.arange(0,100,1);
+generator = data_gen();
+generator.generate_data(model,1,time_series);
 sampler = MCMC(model,log_likelihood);
-sampler.load_data("cell_count_data.csv");
+sampler.load_data("noisy_data.csv");
+sampler.print_data();
 sampler.load_intial_condition(1);
-sampler.run(10000);
+sampler.run(100000);
 
 
 
