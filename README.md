@@ -15,7 +15,9 @@ Steps to set up a test:
 
 
 Output will be of this form. Top is a fit of a curve to the data set where green is the most current parameter set. Bottom is a trace plot of the Log likelihood proposals over time. 
-![distribution_data](https://github.com/Averydx/MCMC/assets/79957750/ea5dc574-8a82-436f-b452-a1a8fc7eb087)
+
+![distribution_data](https://github.com/Averydx/MCMC/assets/79957750/8a206383-bff0-42fd-8084-71991edafecb)
+
 
 
 
