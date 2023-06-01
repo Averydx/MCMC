@@ -25,7 +25,7 @@ class MCMC:
 
     def init_fields(self):
         # arbitrary first guess for parameter set
-        params_0 = [0, 1];
+        params_0 = [0];
 
         # first LL
         LL_init = self.LL(self.ODE,self.intial_condition,self.time_series,self.data, params_0);
@@ -49,17 +49,14 @@ class MCMC:
             if i % 100 == 0:
                 print("Percent complete: {0}".format(round((i / self.iter) * 100, 2)));
                 print("acceptance rate: {0}\n".format(round((num_accept / i) * 100, 2)));
-                if num_accept/i > .234:
-                    self.scale *= 1.1;
-                else:
-                    self.scale *= 0.9;
+            if num_accept / i > .234:
+                self.scale *= 1.1;
+            else:
+                self.scale *= 0.9;
 
-            paramtest = [np.random.normal(loc=self.param_set[-1][0], scale=self.scale[0]),
-                         np.random.normal(loc=self.param_set[-1][1], scale=self.scale[1])];
-
+            paramtest = np.random.normal(loc=self.param_set[-1], scale=self.scale[0]);
             #compute the log likelihood of the paramtest given the data
             LL_test = self.LL(self.ODE,self.intial_condition,self.time_series,self.data, paramtest);
-
             #acceptance criteria
             accept = min(1, np.exp(LL_test - self.LL_set[-1]))
             #acceptance check
@@ -76,20 +73,15 @@ class MCMC:
     def plot(self):
 
 
-        fig, (ax1, ax2) = plt.subplots(2);
-        ax1.scatter(self.data['time'], self.data['cell_count'], marker='o', s=5);
+        plt.scatter(self.data['time'], self.data['S'], marker='o', s=5,color='blue');
+        plt.scatter(self.data['time'], self.data['I'], marker='o', s=5,color='red');
+        plt.scatter(self.data['time'], self.data['R'], marker='o', s=5,color='green');
+
+
         # plots some previous param sets for visualization
-        for i in range(0, 100):
-            rand = randrange(0, len(self.param_set));
-            ax1.plot(self.time_series,
-                     odeint(self.ODE, self.intial_condition, self.time_series, args=tuple(self.param_set[rand])),
-                     color="r", alpha=0.1);
-        ax1.plot(self.time_series,
-                 odeint(self.ODE, self.intial_condition, self.time_series, args=tuple(self.param_set[-1])),
-                 color="green", alpha=1);
 
-        ax2.plot(self.LL_set);
-
+        plt.plot(self.time_series,
+                 odeint(self.ODE, self.intial_condition, self.time_series, args=tuple(self.param_set[-1])), alpha=1);
 
         plt.show();
 
@@ -98,25 +90,30 @@ class MCMC:
        self.iter = iter;
        self.init_fields();
        #scale values for the variance of the prior distributions
-       self.scale = np.array([0.1,7]);
+       self.scale = np.array([0.1]);
 
        #Metropolis algorithm
        self.metropolis();
        self.plot();
 
+    def plot_data(self):
+
+        plt.plot(self.data.iloc[: , 1:]);
+        plt.show();
+
 class data_gen:
     def generate_data(self,ODE,ODE_0,time):
-        params = np.array([np.random.uniform(0,1), np.random.uniform(500,2000)]);
-        print(params)
+        params = np.array([0.9]);
         X = odeint(ODE, ODE_0, time, args=tuple(params));
         for x in range(len(X)):
-            X[x] += np.random.normal(0, 100);
+            X[x] += np.random.normal(0, 500);
 
-        X = np.squeeze(X);
-        data = np.stack((time, X), axis=-1);
+        time = np.expand_dims(time,axis=0);
+        time = np.transpose(time);
 
+        data = np.hstack((time, X));
         df = pd.DataFrame(data);
-        df.columns = ["time", "cell_count"];
+        df.columns = ["time", "S","I","R"];
         df.to_csv('noisy_data.csv', index=False);
 
     #Takes in a file_path and returns a pandas dataframe containing your data
@@ -127,35 +124,51 @@ class data_gen:
         sampler.time_series = sampler.data['time'];
 
 
-
 #model definitions
 
 #ODE model
-def model(X,t,arg1,arg2):
-  r = arg1;
-  k = arg2;
-  dXdt = r*X*(1-X/k);
-  return dXdt;
+def model(X,t,arg1):
+  #constants
+  beta = arg1;
+  gamma = 0.5;
 
+  #assign each function to a vector element
+  S = X[0];
+  I = X[1];
+  R = X[2];
+
+  dSdt = (-1 * beta *S * I)/10000;
+  dIdt = (beta *S * I)/10000 - gamma*I;
+  dRdt = gamma * I;
+
+  return [dSdt,dIdt,dRdt];
 #Log likelihood
 def log_likelihood(ODE,ODE_0, t, data,params):
   test_data = odeint(ODE,ODE_0,t,args=tuple(params));
+  test_S = test_data[:,0];
+  data_S = data.loc[:,'S'];
   LL = 0;
-  for i in range(len(data['time'])-1):
-    nd = norm(loc=test_data[i],scale = 1000);
-    LL += nd.logpdf(data['cell_count'][i]);
+  for i in range(len(t)-1):
+    nd = norm(loc=test_S[i],scale = 1000);
+    LL += nd.logpdf(data['S'][i]);
   return LL;
 
 
 time_series = np.arange(0,100,1);
 generator = data_gen();
-generator.generate_data(model,1,time_series);
+generator.generate_data(model,[9900,100,0],time_series);
+
 sampler = MCMC(model,log_likelihood);
-sampler.load_intial_condition(1);
+sampler.load_intial_condition([9900,100,0]);
 generator.load_data(sampler,"noisy_data.csv");
-sampler.print_data();
+
+
 
 sampler.run(1000);
+print(sampler.param_set[-1]);
+
+
+
 
 
 
